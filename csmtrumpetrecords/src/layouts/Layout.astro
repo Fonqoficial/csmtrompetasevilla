@@ -2,7 +2,17 @@
 import '@fontsource-variable/newsreader';
 import '@fontsource-variable/inter';
 import '../styles/global.css';
-const { title = 'CSMTrumpetRecords', description = '' } = Astro.props;
+import { SITE_CONFIG } from '../config';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { 
+  title = SITE_CONFIG.title, 
+  description = SITE_CONFIG.description 
+} = Astro.props;
 ---
 <!doctype html>
 <html lang="es">
@@ -12,17 +22,30 @@ const { title = 'CSMTrumpetRecords', description = '' } = Astro.props;
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="theme-color" content="#13151b" />
+
+    <!-- Requisito A0/A3: Protección estricta frente a indexación en buscadores -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- Metaetiquetas Open Graph -->
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+
+    <!-- Recursos PWA e iconos -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
   </head>
   <body class="site">
     <slot />
+    
+    <!-- Registro del Service Worker -->
     <script is:inline>
-      if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
     </script>
   </body>
 </html>
