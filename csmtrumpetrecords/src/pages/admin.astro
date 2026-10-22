@@ -75,7 +75,7 @@ import { SITE_CONFIG } from '../config';
 </Layout>
 
 <script>
-  import { supabase } from '../lib/supabase';
+  import { supabaseBrowser as supabase } from '../lib/supabase-browser';
 
   async function checkAdminAndLoad() {
     const { data: { session } } = await supabase.auth.getSession();

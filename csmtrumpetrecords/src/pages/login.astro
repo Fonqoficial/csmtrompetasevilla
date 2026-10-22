@@ -79,12 +79,21 @@ import { SITE_CONFIG } from '../config';
   </main>
   
   <script>
-    import { supabase } from '../lib/supabase';
+    import { supabaseBrowser as supabase } from '../lib/supabase-browser';
 
     const form = document.getElementById('login-form') as HTMLFormElement;
     const errorDiv = document.getElementById('error-message');
     const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
     const googleBtn = document.getElementById('google-login-btn');
+
+    // Destino tras entrar (solo rutas internas)
+    const rawNext = new URLSearchParams(window.location.search).get('next') || '/';
+    const next = rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.startsWith('/\\') ? rawNext : '/';
+
+    if (new URLSearchParams(window.location.search).get('error') === 'callback' && errorDiv) {
+      errorDiv.textContent = 'No se pudo completar el acceso. Inténtalo de nuevo.';
+      errorDiv.classList.remove('hidden');
+    }
 
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -114,7 +123,7 @@ import { SITE_CONFIG } from '../config';
           return;
         }
 
-        window.location.href = '/';
+        window.location.href = next;
       } catch (err) {
         errorDiv.textContent = 'Error de conexión con el servidor.';
         errorDiv.classList.remove('hidden');
@@ -126,7 +135,7 @@ import { SITE_CONFIG } from '../config';
     googleBtn?.addEventListener('click', async () => {
       await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/` }
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` }
       });
     });
   </script>

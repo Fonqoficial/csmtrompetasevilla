@@ -3,12 +3,10 @@ import type { APIRoute } from 'astro';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { r2Client, R2_BUCKET_NAME } from '../../../lib/r2';
-import { supabase } from '../../../lib/supabase';
-import { getAuthenticatedUser } from '../../../lib/auth';
 
-export const GET: APIRoute = async ({ request, params }) => {
-  // 1. Verificar autenticación (RF6 / RF7)
-  const user = await getAuthenticatedUser(request);
+export const GET: APIRoute = async ({ request, params, locals }) => {
+  // 1. Verificar autenticación (RF6 / RF7). El middleware ya lo exige, esto es una segunda barrera.
+  const { user, supabase } = locals;
   if (!user) {
     return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401 });
   }

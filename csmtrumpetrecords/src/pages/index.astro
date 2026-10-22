@@ -1,14 +1,10 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getAuthenticatedUser, getUserProfile } from '../lib/auth';
 import { SITE_CONFIG } from '../config';
 
-const user = await getAuthenticatedUser(Astro.request);
-if (!user) {
-  return Astro.redirect('/login');
-}
-
-const profile = await getUserProfile(user.id);
+// Sesión y perfil los deja resueltos el middleware.
+const user = Astro.locals.user!;
+const profile = Astro.locals.profile;
 ---
 
 <Layout title={SITE_CONFIG.title}>

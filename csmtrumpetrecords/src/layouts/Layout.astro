@@ -14,7 +14,6 @@ const {
   description = SITE_CONFIG.description 
 } = Astro.props;
 ---
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <!doctype html>
 <html lang="es">
   <head>
@@ -36,6 +35,9 @@ const {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Turnstile (A7): cargado dentro de <head>, después del doctype -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   </head>
   <body class="site">
     <slot />

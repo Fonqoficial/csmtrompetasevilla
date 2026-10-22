@@ -1,37 +1,33 @@
 import type { APIRoute } from 'astro';
-import { supabase } from '../../../lib/supabase';
+import { createSupabaseServerClient } from '../../../lib/supabase';
+import { json } from '../../../lib/auth';
 
-export const POST: APIRoute = async ({ request, cookies }) => {
+export const POST: APIRoute = async ({ request, cookies, url }) => {
   try {
     const { email, password, display_text } = await request.json();
 
+    if (!email || !password || !display_text?.trim()) {
+      return json({ error: 'Rellena nombre, correo y contraseña' }, 400);
+    }
+
+    const supabase = createSupabaseServerClient(request, cookies);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_text } }
+      options: {
+        data: { display_text: display_text.trim() },
+        // El enlace del correo de confirmación vuelve a esta ruta del servidor.
+        emailRedirectTo: `${url.origin}/auth/callback`,
+      },
     });
 
     if (error) {
-      return new Response(JSON.stringify({ error: error.message }), { status: 400 });
+      return json({ error: error.message }, 400);
     }
 
-    if (data.session) {
-      cookies.set('sb-access-token', data.session.access_token, {
-        path: '/',
-        maxAge: 60 * 60,
-        sameSite: 'lax',
-        secure: import.meta.env.PROD,
-      });
-      cookies.set('sb-refresh-token', data.session.refresh_token, {
-        path: '/',
-        maxAge: 60 * 60 * 24 * 7,
-        sameSite: 'lax',
-        secure: import.meta.env.PROD,
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message || 'Error interno' }), { status: 500 });
+    // Con "Confirm email" activado no hay sesión hasta verificar el correo (RF1).
+    return json({ success: true, needsConfirmation: !data.session });
+  } catch {
+    return json({ error: 'Error interno' }, 500);
   }
 };

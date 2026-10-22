@@ -88,7 +88,7 @@ import { SITE_CONFIG } from '../config';
   </main>
 
   <script>
-    import { supabase } from '../lib/supabase';
+    import { supabaseBrowser as supabase } from '../lib/supabase-browser';
 
     const form = document.getElementById('register-form') as HTMLFormElement;
     const errorDiv = document.getElementById('error-message');
@@ -124,6 +124,17 @@ import { SITE_CONFIG } from '../config';
           return;
         }
 
+        if (result.needsConfirmation) {
+          // "Confirm email" activado: no hay sesión hasta verificar el correo.
+          form.reset();
+          errorDiv.textContent = 'Cuenta creada. Revisa tu correo y pulsa el enlace de confirmación para poder entrar.';
+          errorDiv.classList.remove('hidden', 'text-red-400', 'bg-red-950/50', 'border-red-900/50');
+          errorDiv.classList.add('text-emerald-300', 'bg-emerald-950/50', 'border-emerald-900/50');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Completar Registro';
+          return;
+        }
+
         window.location.href = '/';
       } catch (err) {
         errorDiv.textContent = 'Error de conexión con el servidor.';
@@ -136,7 +147,7 @@ import { SITE_CONFIG } from '../config';
     googleBtn?.addEventListener('click', async () => {
       await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/` }
+        options: { redirectTo: `${window.location.origin}/auth/callback` }
       });
     });
   </script>
