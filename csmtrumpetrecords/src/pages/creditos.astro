@@ -1,0 +1,40 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_CONFIG } from '../config';
+---
+
+<Layout title={`Créditos y Menciones | ${SITE_CONFIG.name}`}>
+  <main class="min-h-screen bg-gray-950 text-white p-6 max-w-3xl mx-auto py-12">
+    <a href="/" class="text-xs text-amber-400 hover:underline mb-6 inline-block">← Volver al inicio</a>
+    
+    <article class="space-y-8 bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-xl">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight mb-2">Créditos del Proyecto</h1>
+        <p class="text-sm text-gray-400">Información institucional y técnica del portal del aula.</p>
+      </div>
+
+      <section class="space-y-3 text-sm text-gray-300">
+        <h2 class="text-base font-semibold text-white">1. Autoría y Centro Académico</h2>
+        <p>Este portal web se enmarca como Trabajo de Fin de Grado (TFG) desarrollado por <strong>Fermín Vicente Moya</strong> para la Cátedra de Trompeta del <strong>Conservatorio Superior de Música "Manuel Castillo" de Sevilla</strong>.</p>
+        <p class="text-xs text-amber-400/90 bg-amber-950/30 border border-amber-900/40 p-3 rounded-lg">
+          <strong>Nota legal del TFG:</strong> Este sitio web es un proyecto académico de carácter experimental y sin ánimo de lucro desarrollado para la gestión de recursos pedagógicos del aula. No constituye un canal de comunicación oficial directo de la institución, sino una herramienta didáctica del alumno.
+        </p>
+      </section>
+
+      <section class="space-y-3 text-sm text-gray-300">
+        <h2 class="text-base font-semibold text-white">2. Tecnologías Empleadas</h2>
+        <ul class="list-disc list-inside space-y-1 text-gray-400">
+          <li><strong>Front-end:</strong> Astro, Tailwind CSS, TypeScript.</li>
+          <li><strong>Back-end y Autenticación:</strong> Supabase (PostgreSQL con políticas RLS).</li>
+          <li><strong>Almacenamiento Multimedia:</strong> Cloudflare R2 (Object Storage con enlaces firmados temporales).</li>
+          <li><strong>Despliegue:</strong> Vercel (Hosting Edge con protección noindex).</li>
+        </ul>
+      </section>
+
+      <section class="space-y-3 text-sm text-gray-300">
+        <h2 class="text-base font-semibold text-white">3. Reconocimiento de Fuentes y Repertorio (RF11)</h2>
+        <p>Las grabaciones en formato MP3 y documentación en PDF albergadas en esta plataforma proceden de registros de interpretación de repertorio y archivos particulares de cátedra. Se reconoce expresamente la autoría de los compositores y arreglistas de cada obra catalogada en el sistema.</p>
+      </section>
+    </article>
+  </main>
+</Layout>

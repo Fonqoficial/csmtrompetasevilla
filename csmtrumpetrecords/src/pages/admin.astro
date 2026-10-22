@@ -1,203 +1,220 @@
 ---
-import '../styles/global.css';
-import { signSession, isValidSession } from '../lib/auth';
-const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD;
-let isAuthenticated = isValidSession(Astro.cookies.get('admin_session')?.value);
-let loginError = false;
+import Layout from '../layouts/Layout.astro';
+import { getAuthenticatedUser, getUserProfile } from '../lib/auth';
+import { supabase } from '../lib/supabase';
+import { SITE_CONFIG } from '../config';
 
-if (Astro.request.method === 'POST' && !isAuthenticated) {
-  const data = await Astro.request.formData();
-  const password = data.get('password');
-  
-  if (password === ADMIN_PASSWORD) {
-    Astro.cookies.set('admin_session', signSession(), { path: '/', maxAge: 60 * 60 * 24 * 7, httpOnly: true, secure: import.meta.env.PROD, sameSite: 'lax' });
-    isAuthenticated = true;
-  } else {
-    loginError = true;
-  }
+// 1. Protección de ruta por rol en el servidor (RF8)
+const user = await getAuthenticatedUser(Astro.request);
+if (!user) return Astro.redirect('/login');
+
+const profile = await getUserProfile(user.id);
+if (!profile || profile.role !== 'administrador') {
+  return Astro.redirect('/'); // Si no es admin, fuera
 }
+
+// 2. Obtener listado de pistas
+const { data: tracks, error } = await supabase
+  .from('tracks')
+  .select('*')
+  .order('created_at', { ascending: false });
 ---
 
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <title>Admin Masivo | CSMTrumpetRecords</title>
-  </head>
-  <body class="bg-neutral-950 text-white min-h-screen p-4 md:p-8">
-    
-    {!isAuthenticated ? (
-      <div class="w-full max-w-sm mx-auto bg-neutral-900 p-8 rounded-xl border border-neutral-800 shadow-xl mt-10">
-        <h1 class="text-xl font-bold mb-2">Acceso Restringido</h1>
-        <p class="text-sm text-neutral-400 mb-6">Introduce la contraseña para subir archivos.</p>
-        
-        <form method="POST" class="flex flex-col gap-4">
-          <input type="password" name="password" placeholder="Contraseña" required class="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-sm focus:border-indigo-500 focus:outline-none" />
-          {loginError && <p class="text-red-400 text-xs">Contraseña incorrecta</p>}
-          <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition mt-2">
-            Entrar
-          </button>
-        </form>
+<Layout title={`Administración | ${SITE_CONFIG.name}`}>
+  <main class="min-h-screen bg-gray-950 text-white p-6 max-w-5xl mx-auto">
+    <header class="flex justify-between items-center mb-8 pb-4 border-b border-gray-800">
+      <div>
+        <h1 class="text-2xl font-bold">Panel de Administración</h1>
+        <p class="text-xs text-gray-400">Gestión de repertorio y recursos - {SITE_CONFIG.name}</p>
       </div>
-    ) : (
-      <div class="w-full max-w-2xl mx-auto bg-neutral-900 p-6 md:p-8 rounded-xl border border-neutral-800 shadow-xl">
-        <div class="flex justify-between items-center mb-6">
+      <a href="/" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition">
+        ← Volver al Aula
+      </a>
+    </header>
+
+    <!-- Formulario de subida de nueva pista -->
+    <section class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8 shadow-xl">
+      <h2 class="text-lg font-semibold mb-4 text-amber-400">Subir Nueva Pista o Recurso</h2>
+      <form id="upload-track-form" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <h1 class="text-2xl font-bold">Subida Masiva de Audios</h1>
-            <p class="text-sm text-neutral-400 mt-1">Sube varios MP3 a la vez. El nombre del archivo será el título.</p>
+            <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Título de la Obra</label>
+            <input type="text" id="title" required class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm" placeholder="Ej: Concierto para Trompeta" />
           </div>
-          <span class="text-xs bg-indigo-900/50 text-indigo-300 px-2 py-1 rounded border border-indigo-800">Sesión Activa</span>
-        </div>
-        
-        <form id="bulk-upload-form" class="flex flex-col gap-5">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm text-neutral-400 mb-1">Intérprete para este lote</label>
-              <input type="text" id="batch-artist" required placeholder="Ej: Aula de Trompeta" class="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-sm focus:border-indigo-500 focus:outline-none" />
-            </div>
-
-            <div>
-              <label class="block text-sm text-neutral-400 mb-1">Categoría para este lote</label>
-              <select id="batch-category" class="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-sm focus:border-indigo-500 focus:outline-none">
-                <option value="Conciertos">Conciertos</option>
-                <option value="Estudios">Estudios</option>
-                <option value="Pasajes Orquestales">Pasajes Orquestales</option>
-                <option value="Cámara">Cámara</option>
-              </select>
-            </div>
-          </div>
-
           <div>
-            <label class="block text-sm text-neutral-400 mb-1">Partitura en PDF (opcional, se asocia a todo el lote)</label>
-            <input type="file" id="score-input" accept="application/pdf" class="w-full text-sm text-neutral-400" />
+            <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Compositor / Autor</label>
+            <input type="text" id="composer" required class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm" placeholder="Ej: J. Haydn" />
           </div>
-
-          <div class="border-2 border-dashed border-neutral-700 hover:border-indigo-500 transition-colors rounded-xl p-8 text-center bg-neutral-950/50 relative">
-            <input type="file" id="file-input" accept="audio/mpeg, audio/mp3" multiple required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-            <div class="pointer-events-none">
-              <p class="text-indigo-400 font-semibold mb-1">Haz clic para seleccionar o arrastra tus MP3 aquí</p>
-              <p class="text-xs text-neutral-500">Puedes seleccionar 10, 20 o los archivos que quieras.</p>
-            </div>
-          </div>
-
-          <button type="submit" id="submit-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed hidden">
-            Comenzar subida de <span id="file-count">0</span> archivos
-          </button>
-        </form>
-
-        <div id="upload-queue" class="mt-6 space-y-2 hidden">
-          <h3 class="text-sm font-semibold text-neutral-300 border-b border-neutral-800 pb-2 mb-3">Progreso de subida</h3>
-          <div id="queue-list" class="flex flex-col gap-2 max-h-96 overflow-y-auto pr-2"></div>
         </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Archivo de Audio (MP3)</label>
+            <input type="file" id="audio-file" accept="audio/mp3,audio/mpeg" required class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Partitura / Documento (PDF - Opcional)</label>
+            <input type="file" id="score-file" accept="application/pdf" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-700 file:text-white hover:file:bg-gray-600" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Crédito de la Fuente / Procedencia (RF11)</label>
+          <input type="text" id="source_credit" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm" placeholder="Ej: Archivo particular de Cátedra / Fuente externa" />
+        </div>
+
+        <div id="upload-status" class="hidden text-sm p-3 rounded-lg"></div>
+
+        <button type="submit" id="submit-upload" class="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg text-sm transition shadow-lg">
+          Subir y Publicar Pista
+        </button>
+      </form>
+    </section>
+
+    <!-- Listado de pistas existentes -->
+    <section class="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-xl">
+      <h2 class="text-lg font-semibold mb-4">Pistas en el Repositorio</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-gray-300">
+          <thead class="bg-gray-800 text-xs uppercase text-gray-400">
+            <tr>
+              <th class="p-3">Título</th>
+              <th class="p-3">Compositor</th>
+              <th class="p-3">Estado</th>
+              <th class="p-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-800">
+            {tracks?.map((track) => (
+              <tr>
+                <td class="p-3 font-medium text-white">{track.title}</td>
+                <td class="p-3 text-gray-400">{track.composer}</td>
+                <td class="p-3">
+                  <span class={`px-2 py-0.5 rounded text-xs ${track.is_published ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'}`}>
+                    {track.is_published ? 'Publicada' : 'Oculta'}
+                  </span>
+                </td>
+                <td class="p-3 text-right space-x-2">
+                  <button 
+                    onclick={`togglePublish('${track.id}', ${!track.is_published})`}
+                    class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs transition"
+                  >
+                    {track.is_published ? 'Ocultar' : 'Mostrar'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    )}
+    </section>
+  </main>
 
-    <script>
-      const form = document.getElementById('bulk-upload-form') as HTMLFormElement;
-      const fileInput = document.getElementById('file-input') as HTMLInputElement;
-      const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
-      const fileCountSpan = document.getElementById('file-count') as HTMLSpanElement;
-      const uploadQueue = document.getElementById('upload-queue') as HTMLDivElement;
-      const queueList = document.getElementById('queue-list') as HTMLDivElement;
-      const batchArtist = document.getElementById('batch-artist') as HTMLInputElement;
-      const batchCategory = document.getElementById('batch-category') as HTMLSelectElement;
-      const scoreInput = document.getElementById('score-input') as HTMLInputElement;
-      let scoreUrl = '';
+  <script>
+    import { supabase } from '../lib/supabase';
 
-      if (fileInput) {
-        // Mostrar el botón cuando se seleccionan archivos
-        fileInput.addEventListener('change', () => {
-          const files = fileInput.files;
-          if (files && files.length > 0) {
-            fileCountSpan.textContent = files.length.toString();
-            submitBtn.classList.remove('hidden');
-            
-            // Previsualizar la lista
-            queueList.innerHTML = '';
-            uploadQueue.classList.remove('hidden');
-            
-            Array.from(files).forEach((file, index) => {
-              // Limpiar el nombre del archivo para usarlo de título
-              const autoTitle = file.name.replace(/\.[^/.]+$/, ""); 
-              
-              const item = document.createElement('div');
-              item.id = `queue-item-${index}`;
-              item.className = 'flex justify-between items-center bg-neutral-950 p-3 rounded-lg border border-neutral-800 text-sm';
-              item.innerHTML = `
-                <span class="truncate pr-4 flex-1 text-neutral-300">${autoTitle}</span>
-                <span class="status text-xs font-mono text-neutral-500 bg-neutral-900 px-2 py-1 rounded">En espera...</span>
-              `;
-              queueList.appendChild(item);
-            });
-          } else {
-            submitBtn.classList.add('hidden');
-            uploadQueue.classList.add('hidden');
-          }
-        });
+    // Función global para alternar publicación (Ocultar / Mostrar - RF9)
+    window.togglePublish = async function(id: string, publishState: boolean) {
+      const { error } = await supabase
+        .from('tracks')
+        .update({ is_published: publishState })
+        .eq('id', id);
 
-        // Procesar la subida en lote
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const files = fileInput.files;
-          if (!files || files.length === 0) return;
-
-          const artist = batchArtist.value;
-          const category = batchCategory.value;
-
-          // Bloquear UI
-          submitBtn.disabled = true;
-          fileInput.disabled = true;
-          batchArtist.disabled = true;
-          batchCategory.disabled = true;
-
-          let successCount = 0;
-
-          // Subir archivos uno por uno para no saturar el servidor ni la red
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const autoTitle = file.name.replace(/\.[^/.]+$/, "");
-            const statusBadge = document.querySelector(`#queue-item-${i} .status`) as HTMLSpanElement;
-            const queueItem = document.getElementById(`queue-item-${i}`) as HTMLDivElement;
-
-            statusBadge.textContent = 'Subiendo...';
-            statusBadge.className = 'status text-xs font-mono text-indigo-400 bg-indigo-900/30 border border-indigo-800/50 px-2 py-1 rounded animate-pulse';
-
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('title', autoTitle); // Auto-nombramiento
-            formData.append('artist', artist);
-            formData.append('category', category);
-            if (scoreUrl) formData.append('score_url', scoreUrl);
-            else if (scoreInput.files?.[0]) formData.append('score', scoreInput.files[0]);
-
-            try {
-              const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData,
-              });
-
-              if (response.ok) {
-                const done = await response.json();
-                if (done.score_url) scoreUrl = done.score_url;
-                statusBadge.textContent = '¡Completado!';
-                statusBadge.className = 'status text-xs font-mono text-green-400 bg-green-900/30 border border-green-800/50 px-2 py-1 rounded';
-                queueItem.classList.add('border-green-900/50');
-                successCount++;
-              } else {
-                const result = await response.json();
-                throw new Error(result.error || 'Error de servidor');
-              }
-            } catch (error: any) {
-              statusBadge.textContent = 'Error';
-              statusBadge.className = 'status text-xs font-mono text-red-400 bg-red-900/30 border border-red-800/50 px-2 py-1 rounded';
-              statusBadge.title = error.message; // Mostrar error al pasar el ratón
-            }
-          }
-
-          submitBtn.textContent = `Proceso finalizado (${successCount}/${files.length})`;
-          submitBtn.classList.replace('bg-indigo-600', 'bg-neutral-800');
-          submitBtn.classList.replace('hover:bg-indigo-500', 'hover:bg-neutral-700');
-        });
+      if (error) {
+        alert('Error al actualizar el estado: ' + error.message);
+      } else {
+        window.location.reload();
       }
-    </script>
-  </body>
-</html>
+    };
+
+    const form = document.getElementById('upload-track-form') as HTMLFormElement;
+    const statusDiv = document.getElementById('upload-status');
+    const submitBtn = document.getElementById('submit-upload') as HTMLButtonElement;
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!statusDiv || !submitBtn) return;
+
+      statusDiv.className = 'hidden text-sm p-3 rounded-lg';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Subiendo archivos a R2...';
+
+      const title = (document.getElementById('title') as HTMLInputElement).value;
+      const composer = (document.getElementById('composer') as HTMLInputElement).value;
+      const source_credit = (document.getElementById('source_credit') as HTMLInputElement).value;
+      const audioInput = document.getElementById('audio-file') as HTMLInputElement;
+      const scoreInput = document.getElementById('score-file') as HTMLInputElement;
+
+      const audioFile = audioInput.files?.[0];
+      const scoreFile = scoreInput.files?.[0];
+
+      if (!audioFile) {
+        statusDiv.textContent = 'El archivo de audio es obligatorio.';
+        statusDiv.className = 'text-sm text-red-400 bg-red-950/50 border border-red-900/50 p-3 rounded-lg';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Subir y Publicar Pista';
+        return;
+      }
+
+      try {
+        // 1. Subir Audio
+        const audioRes = await fetch('/api/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: audioFile.name, fileType: audioFile.type })
+        });
+        const audioData = await audioRes.json();
+        if (!audioRes.ok) throw new Error(audioData.error);
+
+        await fetch(audioData.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': audioFile.type },
+          body: audioFile
+        });
+        const audioKey = audioData.objectKey;
+
+        // 2. Subir Partitura (si existe)
+        let scoreKey = null;
+        if (scoreFile) {
+          const scoreRes = await fetch('/api/upload-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: scoreFile.name, fileType: scoreFile.type })
+          });
+          const scoreData = await scoreRes.json();
+          if (!scoreRes.ok) throw new Error(scoreData.error);
+
+          await fetch(scoreData.uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': scoreFile.type },
+            body: scoreFile
+          });
+          scoreKey = scoreData.objectKey;
+        }
+
+        // 3. Guardar metadatos en Supabase
+        const { error: dbError } = await supabase.from('tracks').insert({
+          title,
+          composer,
+          audio_key: audioKey,
+          score_key: scoreKey,
+          source_credit,
+          is_published: true
+        });
+
+        if (dbError) throw new Error(dbError.message);
+
+        statusDiv.textContent = '¡Pista subida y publicada con éxito!';
+        statusDiv.className = 'text-sm text-emerald-400 bg-emerald-950/50 border border-emerald-900/50 p-3 rounded-lg';
+        form.reset();
+        setTimeout(() => window.location.reload(), 1500);
+
+      } catch (err: any) {
+        statusDiv.textContent = 'Error: ' + (err.message || 'Error desconocido');
+        statusDiv.className = 'text-sm text-red-400 bg-red-950/50 border border-red-900/50 p-3 rounded-lg';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Subir y Publicar Pista';
+      }
+    });
+  </script>
+</Layout>

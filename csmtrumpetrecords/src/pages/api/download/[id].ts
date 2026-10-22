@@ -1,21 +1,61 @@
+// src/pages/api/download/[id].ts
 import type { APIRoute } from 'astro';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { r2Client, R2_BUCKET_NAME } from '../../../lib/r2';
 import { supabase } from '../../../lib/supabase';
+import { getAuthenticatedUser } from '../../../lib/auth';
 
-// Los navegadores ignoran el atributo "download" en URLs de otro dominio (R2),
-// por eso se sirve el archivo desde aquí con un nombre limpio.
-export const GET: APIRoute = async ({ params }) => {
-  const { data } = await supabase.from('tracks').select('title,artist,audio_url').eq('id', params.id).single();
-  if (!data) return new Response('Grabación no encontrada', { status: 404 });
+export const GET: APIRoute = async ({ request, params }) => {
+  // 1. Verificar autenticación (RF6 / RF7)
+  const user = await getAuthenticatedUser(request);
+  if (!user) {
+    return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401 });
+  }
 
-  const upstream = await fetch(data.audio_url);
-  if (!upstream.ok || !upstream.body) return new Response('Archivo no disponible', { status: 502 });
+  const trackId = params.id;
+  const urlParams = new URL(request.url);
+  const type = urlParams.searchParams.get('type') || 'audio'; // 'audio' o 'score'
 
-  const name = `${data.artist} - ${data.title}`.replace(/[^\p{L}\p{N} .,_-]/gu, '').trim() || 'grabacion';
-  const headers: Record<string, string> = {
-    'Content-Type': 'audio/mpeg',
-    'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}.mp3`,
-  };
-  const len = upstream.headers.get('content-length');
-  if (len) headers['Content-Length'] = len;
-  return new Response(upstream.body, { headers });
+  if (!trackId) {
+    return new Response(JSON.stringify({ error: 'ID de pista no proporcionado' }), { status: 400 });
+  }
+
+  // 2. Obtener la información de la pista desde Supabase
+  const { data: track, error } = await supabase
+    .from('tracks')
+    .select('*')
+    .eq('id', trackId)
+    .single();
+
+  if (error || !track) {
+    return new Response(JSON.stringify({ error: 'Pista no encontrada' }), { status: 404 });
+  }
+
+  const objectKey = type === 'score' ? track.score_key : track.audio_key;
+  if (!objectKey) {
+    return new Response(JSON.stringify({ error: 'Archivo no disponible' }), { status: 404 });
+  }
+
+  try {
+    // 3. Generar enlace firmado temporal
+    // Para streaming de audio: 2 horas (7200s) para soportar saltos en la reproducción
+    // Para descargas: pocos minutos (300s) con nombre limpio
+    const expiresIn = type === 'score' ? 300 : 7200; 
+
+    const command = new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: objectKey,
+      ...(type === 'score' && {
+        ResponseContentDisposition: `attachment; filename="${track.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`,
+      }),
+    });
+
+    const signedUrl = await getSignedUrl(r2Client, command, { expiresIn });
+
+    // Redirigimos directamente al enlace firmado generado
+    return Response.redirect(signedUrl, 302);
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: 'Error generando enlace firmado' }), { status: 500 });
+  }
 };

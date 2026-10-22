@@ -1,9 +1,46 @@
-// Cachea la web para abrirla sin conexión. El audio y la API no se guardan.
-const CACHE = 'csmtr-v1';
-self.addEventListener('install', (e) => { self.skipWaiting(); });
-self.addEventListener('activate', (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
-self.addEventListener('fetch', (e) => {
-  const u = new URL(e.request.url);
-  if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/api') || u.pathname.startsWith('/admin')) return;
-  e.respondWith(fetch(e.request).then((r) => { const c = r.clone(); caches.open(CACHE).then((x) => x.put(e.request, c)); return r; }).catch(() => caches.match(e.request)));
+// public/sw.js
+const CACHE_NAME = 'csm-trumpet-v1';
+
+// Instalación limpia
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+// Interceptación de peticiones
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // EXCLUSIÓN ESTRICTA: No cachear APIs, autenticación ni enlaces firmados externos (R2)
+  if (
+    url.pathname.startsWith('/api/') || 
+    url.pathname.startsWith('/login') || 
+    url.pathname.startsWith('/register') ||
+    url.hostname.includes('r2.cloudflarestorage.com')
+  ) {
+    return; // Dejar pasar la petición directamente a la red sin caché
+  }
+
+  // Para assets estáticos públicos (CSS, fuentes, iconos)
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      return cachedResponse || fetch(event.request).then((response) => {
+        return response;
+      });
+    })
+  );
 });
