@@ -109,19 +109,26 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '0x4AAAAAA
       const email = (document.getElementById('email') as HTMLInputElement).value;
       const password = (document.getElementById('password') as HTMLInputElement).value;
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
         errorDiv.textContent = error.message;
-        errorDiv.classList.remove('hidden');
+        errorDiv.classList.add('hidden');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Iniciar Sesión';
         return;
       }
 
+      // 🔑 SOLUCIÓN SSR: Inyectar los tokens en cookies para que el servidor los lea
+      if (data.session) {
+        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=3600; SameSite=Lax`;
+        document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=604800; SameSite=Lax`;
+      }
+
+      // Redirigir a la página principal protegida por SSR
       window.location.href = '/';
     });
 

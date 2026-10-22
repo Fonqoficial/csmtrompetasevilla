@@ -125,7 +125,7 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '0x4AAAAAA
       const email = (document.getElementById('email') as HTMLInputElement).value;
       const password = (document.getElementById('password') as HTMLInputElement).value;
 
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -141,6 +141,15 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '0x4AAAAAA
         return;
       }
 
+      // 🔑 Si Supabase devuelve sesión automáticamente (correo sin confirmación obligatoria)
+      if (data.session) {
+        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=3600; SameSite=Lax`;
+        document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=604800; SameSite=Lax`;
+        window.location.href = '/';
+        return;
+      }
+
+      // Si la confirmación por correo está activada en Supabase
       successDiv.textContent = '¡Registro exitoso! Revisa tu correo electrónico para verificar la cuenta antes de iniciar sesión.';
       successDiv.classList.remove('hidden');
       form.reset();
