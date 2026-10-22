@@ -93,9 +93,6 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '0x4AAAAAA
       </div>
     </div>
   </main>
-
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-
   <script>
     import { supabase } from '../lib/supabase';
 
@@ -160,5 +157,5 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '0x4AAAAAA
         errorDiv.classList.remove('hidden');
       }
     });
-  </script>
+  </>
 </Layout>
