@@ -1,10 +1,18 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { getAuthenticatedUser, getUserProfile } from '../lib/auth';
 import { SITE_CONFIG } from '../config';
+
+const user = await getAuthenticatedUser(Astro.request);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const profile = await getUserProfile(user.id);
 ---
 
 <Layout title={SITE_CONFIG.title}>
-  <main id="app-container" class="min-h-screen bg-gray-950 text-white p-6 max-w-4xl mx-auto hidden">
+  <main class="min-h-screen bg-gray-950 text-white p-6 max-w-4xl mx-auto">
     <header class="flex justify-between items-center mb-8 pb-4 border-b border-gray-800">
       <div>
         <h1 class="text-xl font-bold">{SITE_CONFIG.name}</h1>
@@ -12,71 +20,32 @@ import { SITE_CONFIG } from '../config';
       </div>
       <div class="flex items-center gap-4">
         <div class="text-right">
-          <p id="user-display" class="text-sm font-medium text-amber-400">Cargando...</p>
-          <span id="user-role" class="text-xs uppercase tracking-wider bg-gray-800 px-2 py-0.5 rounded text-gray-300">alumno</span>
+          <p class="text-sm font-medium text-amber-400">{profile?.display_text || user.email}</p>
+          <span class="text-xs uppercase tracking-wider bg-gray-800 px-2 py-0.5 rounded text-gray-300">
+            {profile?.role || 'alumno'}
+          </span>
         </div>
-        <button 
-          id="logout-btn"
-          class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded-lg transition"
-        >
-          Cerrar Sesión
-        </button>
+        <form action="/api/auth/signout" method="POST">
+          <button 
+            type="submit" 
+            class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded-lg transition"
+          >
+            Cerrar Sesión
+          </button>
+        </form>
       </div>
     </header>
 
     <section class="space-y-6">
-      <div id="admin-link-container" class="hidden">
-        <a href="/admin" class="inline-block px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition">
-          Ir al Panel de Administración →
-        </a>
-      </div>
-
+      {profile?.role === 'administrador' && (
+        <div class="mb-4">
+          <a href="/admin" class="inline-block px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition">
+            Ir al Panel de Administración →
+          </a>
+        </div>
+      )}
       <h2 class="text-lg font-semibold text-gray-200">Repositorio de Pistas y Recursos</h2>
       <p class="text-sm text-gray-400">Contenido protegido cargado correctamente para usuarios autenticados.</p>
     </section>
   </main>
 </Layout>
-
-<script>
-  import { supabase } from '../lib/supabase';
-
-  async function initSession() {
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      window.location.href = '/login';
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
-
-    const displayEl = document.getElementById('user-display');
-    if (displayEl) {
-      displayEl.textContent = profile?.display_text || session.user.email || '';
-    }
-
-    const roleEl = document.getElementById('user-role');
-    if (roleEl) {
-      roleEl.textContent = profile?.role || 'alumno';
-    }
-
-    if (profile?.role === 'administrador') {
-      const adminContainer = document.getElementById('admin-link-container');
-      if (adminContainer) adminContainer.classList.remove('hidden');
-    }
-
-    const container = document.getElementById('app-container');
-    if (container) container.classList.remove('hidden');
-  }
-
-  initSession();
-
-  document.getElementById('logout-btn')?.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    window.location.href = '/login';
-  });
-</script>

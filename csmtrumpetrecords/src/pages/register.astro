@@ -47,8 +47,7 @@ import { SITE_CONFIG } from '../config';
         </div>
 
         <div id="error-message" class="hidden text-sm text-red-400 bg-red-950/50 border border-red-900/50 p-3 rounded-lg"></div>
-        <div id="success-message" class="hidden text-sm text-emerald-400 bg-emerald-950/50 border border-emerald-900/50 p-3 rounded-lg"></div>
-
+        
         <button 
           type="submit" 
           id="submit-btn"
@@ -65,7 +64,7 @@ import { SITE_CONFIG } from '../config';
         <div class="flex-grow border-t border-gray-800"></div>
       </div>
 
-      <!-- Botón Google OAuth con su icono SVG -->
+      <!-- Botón Google OAuth -->
       <button 
         type="button" 
         id="google-register-btn"
@@ -82,7 +81,7 @@ import { SITE_CONFIG } from '../config';
 
       <div class="text-center mt-6">
         <p class="text-sm text-gray-400">
-          ¿Ya tienes cuenta? <a href="/login" class="text-amber-400 font-medium hover:underline">Inicia sesión</a>
+          ¿Ya tienes cuenta? <a href="/login" class="text-amber-400 font-medium hover:underline">Inicia sesión aquí</a>
         </p>
       </div>
     </div>
@@ -93,16 +92,14 @@ import { SITE_CONFIG } from '../config';
 
     const form = document.getElementById('register-form') as HTMLFormElement;
     const errorDiv = document.getElementById('error-message');
-    const successDiv = document.getElementById('success-message');
     const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
     const googleBtn = document.getElementById('google-register-btn');
 
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (!errorDiv || !successDiv || !submitBtn) return;
+      if (!errorDiv || !submitBtn) return;
 
       errorDiv.classList.add('hidden');
-      successDiv.classList.add('hidden');
       submitBtn.disabled = true;
       submitBtn.textContent = 'Registrando...';
 
@@ -110,40 +107,37 @@ import { SITE_CONFIG } from '../config';
       const email = (document.getElementById('email') as HTMLInputElement).value;
       const password = (document.getElementById('password') as HTMLInputElement).value;
 
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { display_text }
-        }
-      });
+      try {
+        const response = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, display_text }),
+        });
 
-      if (error) {
-        errorDiv.textContent = error.message;
+        const result = await response.json();
+
+        if (!response.ok) {
+          errorDiv.textContent = result.error || 'Error en el registro';
+          errorDiv.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Completar Registro';
+          return;
+        }
+
+        window.location.href = '/';
+      } catch (err) {
+        errorDiv.textContent = 'Error de conexión con el servidor.';
         errorDiv.classList.remove('hidden');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Completar Registro';
-        return;
       }
-
-      successDiv.textContent = '¡Registro exitoso! Ya puedes iniciar sesión.';
-      successDiv.classList.remove('hidden');
-      form.reset();
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Completar Registro';
     });
 
     googleBtn?.addEventListener('click', async () => {
-      const { error } = await supabase.auth.signInWithOAuth({
+      await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/`
-        }
+        options: { redirectTo: `${window.location.origin}/` }
       });
-      if (error && errorDiv) {
-        errorDiv.textContent = error.message;
-        errorDiv.classList.remove('hidden');
-      }
     });
   </script>
 </Layout>

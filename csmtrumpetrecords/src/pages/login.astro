@@ -55,7 +55,7 @@ import { SITE_CONFIG } from '../config';
         <div class="flex-grow border-t border-gray-800"></div>
       </div>
 
-      <!-- Botón Google OAuth con su icono SVG -->
+      <!-- Botón Google OAuth -->
       <button 
         type="button" 
         id="google-login-btn"
@@ -97,33 +97,37 @@ import { SITE_CONFIG } from '../config';
       const email = (document.getElementById('email') as HTMLInputElement).value;
       const password = (document.getElementById('password') as HTMLInputElement).value;
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      try {
+        const response = await fetch('/api/auth/signin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
 
-      if (error) {
-        errorDiv.textContent = error.message;
+        const result = await response.json();
+
+        if (!response.ok) {
+          errorDiv.textContent = result.error || 'Error al iniciar sesión';
+          errorDiv.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Iniciar Sesión';
+          return;
+        }
+
+        window.location.href = '/';
+      } catch (err) {
+        errorDiv.textContent = 'Error de conexión con el servidor.';
         errorDiv.classList.remove('hidden');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Iniciar Sesión';
-        return;
       }
-
-      window.location.href = '/';
     });
 
     googleBtn?.addEventListener('click', async () => {
-      const { error } = await supabase.auth.signInWithOAuth({
+      await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/`
-        }
+        options: { redirectTo: `${window.location.origin}/` }
       });
-      if (error && errorDiv) {
-        errorDiv.textContent = error.message;
-        errorDiv.classList.remove('hidden');
-      }
     });
   </script>
 </Layout>
