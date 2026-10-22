@@ -1,27 +1,10 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getAuthenticatedUser, getUserProfile } from '../lib/auth';
-import { supabase } from '../lib/supabase';
 import { SITE_CONFIG } from '../config';
-
-// 1. Protección de ruta por rol en el servidor (RF8)
-const user = await getAuthenticatedUser(Astro.request);
-if (!user) return Astro.redirect('/login');
-
-const profile = await getUserProfile(user.id);
-if (!profile || profile.role !== 'administrador') {
-  return Astro.redirect('/'); // Si no es admin, fuera
-}
-
-// 2. Obtener listado de pistas
-const { data: tracks, error } = await supabase
-  .from('tracks')
-  .select('*')
-  .order('created_at', { ascending: false });
 ---
 
 <Layout title={`Administración | ${SITE_CONFIG.name}`}>
-  <main class="min-h-screen bg-gray-950 text-white p-6 max-w-5xl mx-auto">
+  <main id="admin-container" class="min-h-screen bg-gray-950 text-white p-6 max-w-5xl mx-auto hidden">
     <header class="flex justify-between items-center mb-8 pb-4 border-b border-gray-800">
       <div>
         <h1 class="text-2xl font-bold">Panel de Administración</h1>
@@ -32,7 +15,6 @@ const { data: tracks, error } = await supabase
       </a>
     </header>
 
-    <!-- Formulario de subida de nueva pista -->
     <section class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8 shadow-xl">
       <h2 class="text-lg font-semibold mb-4 text-amber-400">Subir Nueva Pista o Recurso</h2>
       <form id="upload-track-form" class="space-y-4">
@@ -71,7 +53,6 @@ const { data: tracks, error } = await supabase
       </form>
     </section>
 
-    <!-- Listado de pistas existentes -->
     <section class="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-xl">
       <h2 class="text-lg font-semibold mb-4">Pistas en el Repositorio</h2>
       <div class="overflow-x-auto">
@@ -84,137 +65,179 @@ const { data: tracks, error } = await supabase
               <th class="p-3 text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-800">
-            {tracks?.map((track) => (
-              <tr>
-                <td class="p-3 font-medium text-white">{track.title}</td>
-                <td class="p-3 text-gray-400">{track.composer}</td>
-                <td class="p-3">
-                  <span class={`px-2 py-0.5 rounded text-xs ${track.is_published ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'}`}>
-                    {track.is_published ? 'Publicada' : 'Oculta'}
-                  </span>
-                </td>
-                <td class="p-3 text-right space-x-2">
-                  <button 
-                    onclick={`togglePublish('${track.id}', ${!track.is_published})`}
-                    class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs transition"
-                  >
-                    {track.is_published ? 'Ocultar' : 'Mostrar'}
-                  </button>
-                </td>
-              </tr>
-            ))}
+          <tbody id="tracks-table-body" class="divide-y divide-gray-800">
+            <!-- Cargado por JS -->
           </tbody>
         </table>
       </div>
     </section>
   </main>
+</Layout>
 
-  <script>
-    import { supabase } from '../lib/supabase';
+<script>
+  import { supabase } from '../lib/supabase';
 
-    // Función global para alternar publicación (Ocultar / Mostrar - RF9)
-    window.togglePublish = async function(id: string, publishState: boolean) {
-      const { error } = await supabase
-        .from('tracks')
-        .update({ is_published: publishState })
-        .eq('id', id);
+  async function checkAdminAndLoad() {
+    const { data: { session } } = await supabase.auth.getSession();
 
-      if (error) {
-        alert('Error al actualizar el estado: ' + error.message);
-      } else {
-        window.location.reload();
-      }
-    };
+    if (!session) {
+      window.location.href = '/login';
+      return;
+    }
 
-    const form = document.getElementById('upload-track-form') as HTMLFormElement;
-    const statusDiv = document.getElementById('upload-status');
-    const submitBtn = document.getElementById('submit-upload') as HTMLButtonElement;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
 
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (!statusDiv || !submitBtn) return;
+    if (!profile || profile.role !== 'administrador') {
+      window.location.href = '/';
+      return;
+    }
 
-      statusDiv.className = 'hidden text-sm p-3 rounded-lg';
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Subiendo archivos a R2...';
+    const container = document.getElementById('admin-container');
+    if (container) container.classList.remove('hidden');
 
-      const title = (document.getElementById('title') as HTMLInputElement).value;
-      const composer = (document.getElementById('composer') as HTMLInputElement).value;
-      const source_credit = (document.getElementById('source_credit') as HTMLInputElement).value;
-      const audioInput = document.getElementById('audio-file') as HTMLInputElement;
-      const scoreInput = document.getElementById('score-file') as HTMLInputElement;
+    loadTracks();
+  }
 
-      const audioFile = audioInput.files?.[0];
-      const scoreFile = scoreInput.files?.[0];
+  async function loadTracks() {
+    const { data: tracks, error } = await supabase
+      .from('tracks')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (!audioFile) {
-        statusDiv.textContent = 'El archivo de audio es obligatorio.';
-        statusDiv.className = 'text-sm text-red-400 bg-red-950/50 border border-red-900/50 p-3 rounded-lg';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Subir y Publicar Pista';
-        return;
-      }
+    const tbody = document.getElementById('tracks-table-body');
+    if (!tbody) return;
 
-      try {
-        // 1. Subir Audio
-        const audioRes = await fetch('/api/upload-url', {
+    if (error || !tracks) {
+      tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Error al cargar las pistas.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = tracks.map((track) => `
+      <tr>
+        <td class="p-3 font-medium text-white">${track.title}</td>
+        <td class="p-3 text-gray-400">${track.composer}</td>
+        <td class="p-3">
+          <span class="px-2 py-0.5 rounded text-xs ${track.is_published ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'}">
+            ${track.is_published ? 'Publicada' : 'Oculta'}
+          </span>
+        </td>
+        <td class="p-3 text-right space-x-2">
+          <button 
+            onclick="window.togglePublish('${track.id}', ${!track.is_published})"
+            class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs transition"
+          >
+            ${track.is_published ? 'Ocultar' : 'Mostrar'}
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  (window as any).togglePublish = async function(id: string, publishState: boolean) {
+    const { error } = await supabase
+      .from('tracks')
+      .update({ is_published: publishState })
+      .eq('id', id);
+
+    if (error) {
+      alert('Error al actualizar el estado: ' + error.message);
+    } else {
+      loadTracks();
+    }
+  };
+
+  checkAdminAndLoad();
+
+  const form = document.getElementById('upload-track-form') as HTMLFormElement;
+  const statusDiv = document.getElementById('upload-status');
+  const submitBtn = document.getElementById('submit-upload') as HTMLButtonElement;
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!statusDiv || !submitBtn) return;
+
+    statusDiv.className = 'hidden text-sm p-3 rounded-lg';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Subiendo archivos...';
+
+    const title = (document.getElementById('title') as HTMLInputElement).value;
+    const composer = (document.getElementById('composer') as HTMLInputElement).value;
+    const source_credit = (document.getElementById('source_credit') as HTMLInputElement).value;
+    const audioInput = document.getElementById('audio-file') as HTMLInputElement;
+    const scoreInput = document.getElementById('score-file') as HTMLInputElement;
+
+    const audioFile = audioInput.files?.[0];
+    const scoreFile = scoreInput.files?.[0];
+
+    if (!audioFile) {
+      statusDiv.textContent = 'El archivo de audio es obligatorio.';
+      statusDiv.className = 'text-sm text-red-400 bg-red-950/50 border border-red-900/50 p-3 rounded-lg';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Subir y Publicar Pista';
+      return;
+    }
+
+    try {
+      const audioRes = await fetch('/api/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: audioFile.name, fileType: audioFile.type })
+      });
+      const audioData = await audioRes.json();
+      if (!audioRes.ok) throw new Error(audioData.error);
+
+      await fetch(audioData.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': audioFile.type },
+        body: audioFile
+      });
+      const audioKey = audioData.objectKey;
+
+      let scoreKey = null;
+      if (scoreFile) {
+        const scoreRes = await fetch('/api/upload-url', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: audioFile.name, fileType: audioFile.type })
+          body: JSON.stringify({ filename: scoreFile.name, fileType: scoreFile.type })
         });
-        const audioData = await audioRes.json();
-        if (!audioRes.ok) throw new Error(audioData.error);
+        const scoreData = await scoreRes.json();
+        if (!scoreRes.ok) throw new Error(scoreData.error);
 
-        await fetch(audioData.uploadUrl, {
+        await fetch(scoreData.uploadUrl, {
           method: 'PUT',
-          headers: { 'Content-Type': audioFile.type },
-          body: audioFile
+          headers: { 'Content-Type': scoreFile.type },
+          body: scoreFile
         });
-        const audioKey = audioData.objectKey;
-
-        // 2. Subir Partitura (si existe)
-        let scoreKey = null;
-        if (scoreFile) {
-          const scoreRes = await fetch('/api/upload-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: scoreFile.name, fileType: scoreFile.type })
-          });
-          const scoreData = await scoreRes.json();
-          if (!scoreRes.ok) throw new Error(scoreData.error);
-
-          await fetch(scoreData.uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': scoreFile.type },
-            body: scoreFile
-          });
-          scoreKey = scoreData.objectKey;
-        }
-
-        // 3. Guardar metadatos en Supabase
-        const { error: dbError } = await supabase.from('tracks').insert({
-          title,
-          composer,
-          audio_key: audioKey,
-          score_key: scoreKey,
-          source_credit,
-          is_published: true
-        });
-
-        if (dbError) throw new Error(dbError.message);
-
-        statusDiv.textContent = '¡Pista subida y publicada con éxito!';
-        statusDiv.className = 'text-sm text-emerald-400 bg-emerald-950/50 border border-emerald-900/50 p-3 rounded-lg';
-        form.reset();
-        setTimeout(() => window.location.reload(), 1500);
-
-      } catch (err: any) {
-        statusDiv.textContent = 'Error: ' + (err.message || 'Error desconocido');
-        statusDiv.className = 'text-sm text-red-400 bg-red-950/50 border border-red-900/50 p-3 rounded-lg';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Subir y Publicar Pista';
+        scoreKey = scoreData.objectKey;
       }
-    });
-  </script>
-</Layout>
+
+      const { error: dbError } = await supabase.from('tracks').insert({
+        title,
+        composer,
+        audio_key: audioKey,
+        score_key: scoreKey,
+        source_credit,
+        is_published: true
+      });
+
+      if (dbError) throw new Error(dbError.message);
+
+      statusDiv.textContent = '¡Pista subida y publicada con éxito!';
+      statusDiv.className = 'text-sm text-emerald-400 bg-emerald-950/50 border border-emerald-900/50 p-3 rounded-lg';
+      form.reset();
+      loadTracks();
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Subir y Publicar Pista';
+
+    } catch (err: any) {
+      statusDiv.textContent = 'Error: ' + (err.message || 'Error desconocido');
+      statusDiv.className = 'text-sm text-red-400 bg-red-950/50 border border-red-900/50 p-3 rounded-lg';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Subir y Publicar Pista';
+    }
+  });
+</script>
