@@ -5,6 +5,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { r2Client, R2_BUCKET_NAME } from '../../lib/r2';
 import { json } from '../../lib/auth';
 
+// Solo audio MP3 y partituras PDF.
+const ALLOWED_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'application/pdf']);
+
 export const POST: APIRoute = async ({ request, locals }) => {
   // 1. Sesión y rol de administrador (resueltos por el middleware con el token del usuario)
   if (!locals.user) {
@@ -18,6 +21,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const { filename, fileType } = await request.json();
     if (!filename || !fileType) {
       return json({ error: 'Faltan parámetros' }, 400);
+    }
+    if (!ALLOWED_TYPES.has(String(fileType))) {
+      return json({ error: 'Tipo de archivo no permitido (solo MP3 y PDF)' }, 400);
     }
 
     const uniqueKey = `${Date.now()}-${String(filename).replace(/[^a-zA-Z0-9.-]/g, '_')}`;

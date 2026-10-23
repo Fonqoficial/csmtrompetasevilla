@@ -11,13 +11,13 @@ const name = track.mov
 ---
 
 <li class="mov" data-label={`${work}, ${name}`}>
-  <audio src={track.audio_url} preload="metadata"></audio>
+  <audio preload="none" data-src={`/api/download/${track.id}`}></audio>
   <button type="button" class="play" aria-label={`Reproducir ${work}, ${name}`}>
     <span class="i-play"><Play size={16} class="fill-current" /></span>
     <span class="i-pause" hidden><Pause size={16} class="fill-current" /></span>
   </button>
   <div><span class="mov-name">{name}</span><span class="dur">0:00</span></div>
-  <a class="dl" href={`/api/download/${track.id}`} aria-label={`Descargar ${work}, ${name}`}><Download size={15} />Descargar</a>
+  <a class="dl" href={`/api/download/${track.id}?dl=1`} aria-label={`Descargar ${work}, ${name}`}><Download size={15} />Descargar</a>
   <div class="ctl">
     <input type="range" class="bar" aria-label="Posición de reproducción" value="0" min="0" max="100" step="0.1" />
     <div class="ctl-row">
@@ -68,7 +68,21 @@ const name = track.mov
     playBtn.addEventListener('click', () => {
       if (!audio.paused) return audio.pause();
       document.querySelectorAll('audio').forEach((o) => o !== audio && o.pause());
+      // La URL firmada de R2 se pide solo al reproducir (no al cargar la página).
+      if (!audio.getAttribute('src')) audio.src = audio.dataset.src ?? '';
       audio.play();
+    });
+    // Si el enlace firmado caducó (2 h), pide uno nuevo y sigue por donde iba.
+    audio.addEventListener('error', () => {
+      const t = audio.currentTime;
+      if (!audio.dataset.src || audio.dataset.retried === '1') return;
+      audio.dataset.retried = '1';
+      audio.src = audio.dataset.src;
+      audio.addEventListener('loadedmetadata', () => {
+        audio.currentTime = t;
+        audio.dataset.retried = '';
+        audio.play();
+      }, { once: true });
     });
     audio.addEventListener('timeupdate', () => {
       if (a !== null && b !== null && audio.currentTime >= b) audio.currentTime = a;

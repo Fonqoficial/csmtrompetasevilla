@@ -190,11 +190,12 @@ import { SITE_CONFIG } from '../config';
       const audioData = await audioRes.json();
       if (!audioRes.ok) throw new Error(audioData.error);
 
-      await fetch(audioData.uploadUrl, {
+      const audioPut = await fetch(audioData.uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': audioFile.type },
         body: audioFile
       });
+      if (!audioPut.ok) throw new Error('No se pudo subir el audio a R2 (revisa la política CORS del bucket).');
       const audioKey = audioData.objectKey;
 
       let scoreKey = null;
@@ -207,11 +208,12 @@ import { SITE_CONFIG } from '../config';
         const scoreData = await scoreRes.json();
         if (!scoreRes.ok) throw new Error(scoreData.error);
 
-        await fetch(scoreData.uploadUrl, {
+        const scorePut = await fetch(scoreData.uploadUrl, {
           method: 'PUT',
           headers: { 'Content-Type': scoreFile.type },
           body: scoreFile
         });
+        if (!scorePut.ok) throw new Error('No se pudo subir la partitura a R2 (revisa la política CORS del bucket).');
         scoreKey = scoreData.objectKey;
       }
 
