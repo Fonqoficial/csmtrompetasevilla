@@ -50,3 +50,6 @@ body.site { background: var(--paper); color: var(--ink); font: 400 0.95rem/1.6 v
 .empty { color: var(--muted); padding: 3rem 0; }
 footer.site-foot { border-top: 1px solid var(--rule); margin-top: 3rem; padding: 1.5rem 0 3rem; color: var(--muted); font-size: 0.8rem; }
 @media (prefers-reduced-motion: reduce) { .play { transition: none; } }
+
+/* Para usar el reproductor dentro de páginas con fondo oscuro fijo (Tailwind gray-950). */
+.theme-dark { --paper: #13151b; --ink: #e8e8e4; --muted: #9aa1ae; --rule: #2a2e38; --accent: #d4ab52; color: var(--ink); font-family: var(--sans); }

@@ -1,10 +1,22 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import TrackCard from '../components/TrackCard.astro';
+import { FileText } from 'lucide-astro';
 import { SITE_CONFIG } from '../config';
+import { groupTracks, type TrackRow } from '../lib/tracks';
 
 // Sesión y perfil los deja resueltos el middleware.
 const user = Astro.locals.user!;
 const profile = Astro.locals.profile;
+
+// Con el token del usuario: RLS decide qué pistas ve (publicadas; las ocultas, solo admin).
+const { data, error } = await Astro.locals.supabase
+  .from('tracks')
+  .select('id, title, composer, audio_key, score_key, created_at')
+  .order('created_at', { ascending: true });
+
+if (error) console.error('[index] Error leyendo las pistas:', error.message);
+const works = groupTracks((data ?? []) as TrackRow[]);
 ---
 
 <Layout title={SITE_CONFIG.title}>
@@ -41,7 +53,36 @@ const profile = Astro.locals.profile;
         </div>
       )}
       <h2 class="text-lg font-semibold text-gray-200">Repositorio de Pistas y Recursos</h2>
-      <p class="text-sm text-gray-400">Contenido protegido cargado correctamente para usuarios autenticados.</p>
+
+      {error && (
+        <p class="text-sm text-red-400">No se han podido cargar las pistas. Inténtalo de nuevo en unos minutos.</p>
+      )}
+      {!error && works.length === 0 && (
+        <p class="text-sm text-gray-400">Todavía no hay pistas publicadas.</p>
+      )}
+
+      <div class="theme-dark">
+        {works.map((w) => (
+          <section class="work">
+            <div class="work-head">
+              <div>
+                <h2>{w.work}</h2>
+                <p class="composer">{w.composer}</p>
+              </div>
+              {w.scoreId && (
+                <a class="score" href={`/api/download/${w.scoreId}?type=score`}>
+                  <FileText size={15} />Partitura (PDF)
+                </a>
+              )}
+            </div>
+            <ul class="movs">
+              {w.movements.map((m) => (
+                <TrackCard track={{ id: m.id, title: m.title, composer: w.composer, is_published: true, mov: m.mov }} work={w.work} />
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
     </section>
   </main>
 </Layout>
