@@ -1,245 +1,472 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { ArrowLeft, Upload, Pencil, Trash2, Eye, EyeOff, FileText, Music, Search, X } from 'lucide-astro';
 import { SITE_CONFIG } from '../config';
+
+// El middleware ya exige sesión y rol de administrador para /admin.
+// Las pistas se leen aquí, en el servidor, con el token del usuario (RLS).
+const profile = Astro.locals.profile;
+const { data, error } = await Astro.locals.supabase
+  .from('tracks')
+  .select('id, title, composer, category, source_credit, is_published, audio_key, score_key, created_at')
+  .order('created_at', { ascending: false });
+
+const tracks = data ?? [];
+const published = tracks.filter((t) => t.is_published).length;
+const withScore = tracks.filter((t) => t.score_key).length;
+const categories = [...new Set(tracks.map((t) => t.category).filter(Boolean))].sort() as string[];
 ---
 
 <Layout title={`Administración | ${SITE_CONFIG.name}`}>
-  <main id="admin-container" class="min-h-screen bg-gray-950 text-white p-6 max-w-5xl mx-auto hidden">
-    <header class="flex justify-between items-center mb-8 pb-4 border-b border-gray-800">
-      <div>
-        <h1 class="text-2xl font-bold">Panel de Administración</h1>
-        <p class="text-xs text-gray-400">Gestión de repertorio y recursos - {SITE_CONFIG.name}</p>
+  <div class="min-h-screen bg-gray-50 text-gray-900 [color-scheme:light]">
+    <header class="border-b border-gray-200 bg-white">
+      <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+        <div class="flex items-center gap-3">
+          <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-600 text-white">
+            <Music size={18} />
+          </span>
+          <div>
+            <p class="text-sm font-semibold leading-tight">{SITE_CONFIG.name}</p>
+            <p class="text-xs text-gray-500">Panel de administración</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="hidden text-sm text-gray-600 sm:inline">{profile?.display_text}</span>
+          <a href="/" class="btn-secondary"><ArrowLeft size={16} />Volver al aula</a>
+        </div>
       </div>
-      <a href="/" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition">
-        ← Volver al Aula
-      </a>
     </header>
 
-    <section class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8 shadow-xl">
-      <h2 class="text-lg font-semibold mb-4 text-amber-400">Subir Nueva Pista o Recurso</h2>
-      <form id="upload-track-form" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Título de la Obra</label>
-            <input type="text" id="title" required class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm" placeholder="Ej: Concierto para Trompeta" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Compositor / Autor</label>
-            <input type="text" id="composer" required class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm" placeholder="Ej: J. Haydn" />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Archivo de Audio (MP3)</label>
-            <input type="file" id="audio-file" accept="audio/mp3,audio/mpeg" required class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Partitura / Documento (PDF - Opcional)</label>
-            <input type="file" id="score-file" accept="application/pdf" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-700 file:text-white hover:file:bg-gray-600" />
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-gray-300 uppercase mb-1">Crédito de la Fuente / Procedencia (RF11)</label>
-          <input type="text" id="source_credit" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm" placeholder="Ej: Archivo particular de Cátedra / Fuente externa" />
-        </div>
-
-        <div id="upload-status" class="hidden text-sm p-3 rounded-lg"></div>
-
-        <button type="submit" id="submit-upload" class="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg text-sm transition shadow-lg">
-          Subir y Publicar Pista
-        </button>
-      </form>
-    </section>
-
-    <section class="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-xl">
-      <h2 class="text-lg font-semibold mb-4">Pistas en el Repositorio</h2>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm text-gray-300">
-          <thead class="bg-gray-800 text-xs uppercase text-gray-400">
-            <tr>
-              <th class="p-3">Título</th>
-              <th class="p-3">Compositor</th>
-              <th class="p-3">Estado</th>
-              <th class="p-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tracks-table-body" class="divide-y divide-gray-800">
-            <!-- Cargado por JS -->
-          </tbody>
-        </table>
+    <main class="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Repertorio y recursos</h1>
+        <p class="mt-1 text-sm text-gray-500">Sube pistas y partituras, edita sus datos y decide qué ven los alumnos.</p>
       </div>
-    </section>
-  </main>
+
+      <!-- Resumen -->
+      <dl class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div class="card p-4">
+          <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Pistas</dt>
+          <dd class="mt-1 text-2xl font-semibold">{tracks.length}</dd>
+        </div>
+        <div class="card p-4">
+          <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Publicadas</dt>
+          <dd class="mt-1 text-2xl font-semibold text-emerald-700">{published}</dd>
+        </div>
+        <div class="card p-4">
+          <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Ocultas</dt>
+          <dd class="mt-1 text-2xl font-semibold text-gray-600">{tracks.length - published}</dd>
+        </div>
+        <div class="card p-4">
+          <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Con partitura</dt>
+          <dd class="mt-1 text-2xl font-semibold text-primary-700">{withScore}</dd>
+        </div>
+      </dl>
+
+      <!-- Subir -->
+      <section class="card p-6">
+        <h2 class="text-base font-semibold">Subir nueva pista</h2>
+        <p class="mt-1 text-sm text-gray-500">El audio es obligatorio (MP3). La partitura es opcional (PDF).</p>
+
+        <form id="upload-form" class="mt-5 space-y-5">
+          <div class="grid gap-4 md:grid-cols-2">
+            <div>
+              <label class="field-label" for="up-title">Título de la obra o movimiento</label>
+              <input id="up-title" name="title" type="text" required maxlength="200" class="field" placeholder="Ej: Trumpet Concerto in D Major - I. Adagio" />
+            </div>
+            <div>
+              <label class="field-label" for="up-composer">Compositor / autor</label>
+              <input id="up-composer" name="composer" type="text" required maxlength="120" class="field" placeholder="Ej: Georg Philipp Telemann" />
+            </div>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <div>
+              <label class="field-label" for="up-audio">Archivo de audio (MP3)</label>
+              <input id="up-audio" name="audio" type="file" accept="audio/mpeg,audio/mp3,.mp3" required class="field file:mr-3 file:rounded-md file:border-0 file:bg-primary-600 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-primary-700" />
+            </div>
+            <div>
+              <label class="field-label" for="up-score">Partitura (PDF, opcional)</label>
+              <input id="up-score" name="score" type="file" accept="application/pdf,.pdf" class="field file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-gray-700 hover:file:bg-gray-200" />
+            </div>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <div>
+              <label class="field-label" for="up-category">Categoría</label>
+              <input id="up-category" name="category" type="text" list="category-list" maxlength="60" class="field" placeholder="Ej: Conciertos" />
+            </div>
+            <div>
+              <label class="field-label" for="up-credit">Crédito de la fuente (RF11)</label>
+              <input id="up-credit" name="source_credit" type="text" maxlength="300" class="field" placeholder="Ej: Archivo particular de la cátedra" />
+            </div>
+          </div>
+
+          <datalist id="category-list">
+            {categories.map((c) => <option value={c} />)}
+          </datalist>
+
+          <div class="flex items-center gap-4">
+            <button type="submit" id="upload-submit" class="btn-primary"><Upload size={16} />Subir y publicar</button>
+            <p id="upload-status" class="text-sm" role="status" aria-live="polite"></p>
+          </div>
+        </form>
+      </section>
+
+      <!-- Listado -->
+      <section class="card overflow-hidden">
+        <div class="flex flex-col gap-3 border-b border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <h2 class="text-base font-semibold">Pistas en el repositorio</h2>
+          <div class="relative sm:w-72">
+            <Search size={16} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input id="filter" type="search" class="field pl-9" placeholder="Buscar por título, compositor…" aria-label="Buscar pistas" />
+          </div>
+        </div>
+
+        {error && <p class="p-6 text-sm text-red-600">No se han podido cargar las pistas. Recarga la página.</p>}
+
+        {!error && (
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th scope="col" class="px-4 py-3 font-medium sm:px-5">Pista</th>
+                  <th scope="col" class="hidden px-4 py-3 font-medium md:table-cell">Categoría</th>
+                  <th scope="col" class="hidden px-4 py-3 font-medium md:table-cell">Archivos</th>
+                  <th scope="col" class="px-4 py-3 font-medium">Estado</th>
+                  <th scope="col" class="px-4 py-3 text-right font-medium sm:px-5">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tracks-body" class="divide-y divide-gray-100">
+                {tracks.map((t) => (
+                  <tr
+                    data-row
+                    data-id={t.id}
+                    data-title={t.title}
+                    data-composer={t.composer}
+                    data-category={t.category ?? ''}
+                    data-credit={t.source_credit ?? ''}
+                    data-published={String(t.is_published)}
+                    data-has-score={String(!!t.score_key)}
+                    data-search={`${t.title} ${t.composer} ${t.category ?? ''}`.toLowerCase()}
+                    class="hover:bg-gray-50/70"
+                  >
+                    <td class="px-4 py-3 sm:px-5">
+                      <p class="font-medium text-gray-900">{t.title}</p>
+                      <p class="text-gray-500">{t.composer}</p>
+                    </td>
+                    <td class="hidden px-4 py-3 text-gray-600 md:table-cell">{t.category ?? '—'}</td>
+                    <td class="hidden px-4 py-3 md:table-cell">
+                      <span class="inline-flex items-center gap-3 text-xs">
+                        <span class:list={['inline-flex items-center gap-1', t.audio_key ? 'text-gray-700' : 'text-red-600']}>
+                          <Music size={14} />{t.audio_key ? 'MP3' : 'Sin audio'}
+                        </span>
+                        <span class:list={['inline-flex items-center gap-1', t.score_key ? 'text-primary-700' : 'text-gray-400']}>
+                          <FileText size={14} />{t.score_key ? 'PDF' : 'Sin partitura'}
+                        </span>
+                      </span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class:list={['badge ring-1', t.is_published ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' : 'bg-gray-100 text-gray-600 ring-gray-500/20']}>
+                        {t.is_published ? 'Publicada' : 'Oculta'}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 sm:px-5">
+                      <div class="flex justify-end gap-1">
+                        <button type="button" data-action="toggle" class="btn-ghost" title={t.is_published ? 'Ocultar a los alumnos' : 'Publicar'} aria-label={`${t.is_published ? 'Ocultar' : 'Publicar'}: ${t.title}`}>
+                          {t.is_published ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button type="button" data-action="edit" class="btn-ghost" title="Editar" aria-label={`Editar: ${t.title}`}>
+                          <Pencil size={16} />
+                        </button>
+                        <button type="button" data-action="delete" class="btn-ghost hover:bg-red-50 hover:text-red-700" title="Borrar" aria-label={`Borrar: ${t.title}`}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p id="empty-state" class:list={['p-8 text-center text-sm text-gray-500', tracks.length > 0 && 'hidden']}>
+              {tracks.length === 0 ? 'Todavía no hay pistas. Sube la primera arriba.' : 'Ninguna pista coincide con la búsqueda.'}
+            </p>
+          </div>
+        )}
+      </section>
+    </main>
+  </div>
+
+  <!-- Editar -->
+  <dialog id="edit-dialog" class="[color-scheme:light] m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl bg-white p-0 text-gray-900 shadow-xl backdrop:bg-gray-900/50">
+    <form id="edit-form" class="space-y-5 p-6">
+      <div class="flex items-start justify-between gap-4">
+        <h2 class="text-base font-semibold">Editar pista</h2>
+        <button type="button" data-close class="btn-ghost -mr-2 -mt-1" aria-label="Cerrar"><X size={18} /></button>
+      </div>
+
+      <div>
+        <label class="field-label" for="ed-title">Título</label>
+        <input id="ed-title" name="title" type="text" required maxlength="200" class="field" />
+      </div>
+      <div>
+        <label class="field-label" for="ed-composer">Compositor / autor</label>
+        <input id="ed-composer" name="composer" type="text" required maxlength="120" class="field" />
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="field-label" for="ed-category">Categoría</label>
+          <input id="ed-category" name="category" type="text" list="category-list" maxlength="60" class="field" />
+        </div>
+        <div>
+          <label class="field-label" for="ed-credit">Crédito de la fuente</label>
+          <input id="ed-credit" name="source_credit" type="text" maxlength="300" class="field" />
+        </div>
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label class="field-label" for="ed-audio">Sustituir audio (MP3)</label>
+          <input id="ed-audio" name="audio" type="file" accept="audio/mpeg,audio/mp3,.mp3" class="field file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs" />
+        </div>
+        <div>
+          <label class="field-label" for="ed-score">
+            <span id="ed-score-label">Partitura (PDF)</span>
+          </label>
+          <input id="ed-score" name="score" type="file" accept="application/pdf,.pdf" class="field file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs" />
+        </div>
+      </div>
+
+      <label id="ed-remove-score-wrap" class="flex items-center gap-2 text-sm text-gray-700">
+        <input id="ed-remove-score" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600" />
+        Quitar la partitura actual
+      </label>
+
+      <label class="flex items-center gap-2 text-sm text-gray-700">
+        <input id="ed-published" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600" />
+        Visible para los alumnos
+      </label>
+
+      <p id="edit-error" class="hidden text-sm text-red-600" role="alert"></p>
+
+      <div class="flex justify-end gap-2 border-t border-gray-100 pt-4">
+        <button type="button" data-close class="btn-secondary">Cancelar</button>
+        <button type="submit" id="edit-submit" class="btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Borrar -->
+  <dialog id="delete-dialog" class="[color-scheme:light] m-auto w-[calc(100%-2rem)] max-w-md rounded-xl bg-white p-0 text-gray-900 shadow-xl backdrop:bg-gray-900/50">
+    <div class="space-y-4 p-6">
+      <h2 class="text-base font-semibold">¿Borrar esta pista?</h2>
+      <p class="text-sm text-gray-600">
+        Se eliminará <strong id="delete-title" class="font-medium text-gray-900"></strong>
+        junto con su audio y su partitura. No se puede deshacer.
+      </p>
+      <p id="delete-error" class="hidden text-sm text-red-600" role="alert"></p>
+      <div class="flex justify-end gap-2">
+        <button type="button" data-close class="btn-secondary">Cancelar</button>
+        <button type="button" id="delete-confirm" class="btn-danger">Borrar definitivamente</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Avisos -->
+  <div id="toast" class="pointer-events-none fixed inset-x-4 bottom-4 z-50 mx-auto hidden max-w-sm rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg" role="status" aria-live="polite"></div>
 </Layout>
 
 <script>
-  import { supabaseBrowser as supabase } from '../lib/supabase-browser';
+  const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
-  async function checkAdminAndLoad() {
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      window.location.href = '/login';
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
-
-    if (!profile || profile.role !== 'administrador') {
-      window.location.href = '/';
-      return;
-    }
-
-    const container = document.getElementById('admin-container');
-    if (container) container.classList.remove('hidden');
-
-    loadTracks();
+  // ---- Utilidades -------------------------------------------------------
+  function toast(message: string, kind: 'ok' | 'error' = 'ok') {
+    const el = $('#toast');
+    el.textContent = message;
+    el.className = `pointer-events-none fixed inset-x-4 bottom-4 z-50 mx-auto max-w-sm rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
+      kind === 'ok' ? 'bg-emerald-700' : 'bg-red-600'
+    }`;
+    setTimeout(() => el.classList.add('hidden'), 4000);
   }
 
-  async function loadTracks() {
-    const { data: tracks, error } = await supabase
-      .from('tracks')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    const tbody = document.getElementById('tracks-table-body');
-    if (!tbody) return;
-
-    if (error || !tracks) {
-      tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Error al cargar las pistas.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = tracks.map((track) => `
-      <tr>
-        <td class="p-3 font-medium text-white">${track.title}</td>
-        <td class="p-3 text-gray-400">${track.composer}</td>
-        <td class="p-3">
-          <span class="px-2 py-0.5 rounded text-xs ${track.is_published ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'}">
-            ${track.is_published ? 'Publicada' : 'Oculta'}
-          </span>
-        </td>
-        <td class="p-3 text-right space-x-2">
-          <button 
-            onclick="window.togglePublish('${track.id}', ${!track.is_published})"
-            class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs transition"
-          >
-            ${track.is_published ? 'Ocultar' : 'Mostrar'}
-          </button>
-        </td>
-      </tr>
-    `).join('');
+  /** Recarga la página para ver la lista actualizada y deja un aviso para después. */
+  function reloadWith(message: string) {
+    try { sessionStorage.setItem('admin-flash', message); } catch {}
+    location.reload();
   }
 
-  (window as any).togglePublish = async function(id: string, publishState: boolean) {
-    const { error } = await supabase
-      .from('tracks')
-      .update({ is_published: publishState })
-      .eq('id', id);
+  try {
+    const flash = sessionStorage.getItem('admin-flash');
+    if (flash) { sessionStorage.removeItem('admin-flash'); toast(flash); }
+  } catch {}
 
-    if (error) {
-      alert('Error al actualizar el estado: ' + error.message);
-    } else {
-      loadTracks();
-    }
-  };
+  async function api(url: string, method: string, body?: unknown) {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+    return data;
+  }
 
-  checkAdminAndLoad();
+  function contentType(file: File): string {
+    if (file.type) return file.type;
+    return file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'audio/mpeg';
+  }
 
-  const form = document.getElementById('upload-track-form') as HTMLFormElement;
-  const statusDiv = document.getElementById('upload-status');
-  const submitBtn = document.getElementById('submit-upload') as HTMLButtonElement;
+  /** Sube un archivo a R2 con URL firmada y devuelve su clave de objeto. */
+  async function uploadFile(file: File): Promise<string> {
+    const type = contentType(file);
+    const { uploadUrl, objectKey } = await api('/api/upload-url', 'POST', { filename: file.name, fileType: type });
+    const put = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': type }, body: file });
+    if (!put.ok) throw new Error(`No se pudo subir «${file.name}» a R2 (¿política CORS del bucket?).`);
+    return objectKey;
+  }
 
-  form?.addEventListener('submit', async (e) => {
+  const rowOf = (el: Element) => el.closest<HTMLElement>('[data-row]')!;
+
+  // ---- Subir ------------------------------------------------------------
+  const uploadForm = $<HTMLFormElement>('#upload-form');
+  uploadForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!statusDiv || !submitBtn) return;
+    const status = $('#upload-status');
+    const btn = $<HTMLButtonElement>('#upload-submit');
+    const fd = new FormData(uploadForm);
+    const audio = fd.get('audio') as File;
+    const score = fd.get('score') as File;
 
-    statusDiv.className = 'hidden text-sm p-3 rounded-lg';
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Subiendo archivos...';
+    btn.disabled = true;
+    status.className = 'text-sm text-gray-500';
+    status.textContent = 'Subiendo archivos…';
+    try {
+      const audio_key = await uploadFile(audio);
+      const score_key = score && score.size > 0 ? await uploadFile(score) : null;
+      await api('/api/tracks', 'POST', {
+        title: fd.get('title'),
+        composer: fd.get('composer'),
+        category: fd.get('category'),
+        source_credit: fd.get('source_credit'),
+        audio_key,
+        score_key,
+      });
+      reloadWith('Pista subida y publicada.');
+    } catch (err) {
+      status.className = 'text-sm text-red-600';
+      status.textContent = (err as Error).message;
+      btn.disabled = false;
+    }
+  });
 
-    const title = (document.getElementById('title') as HTMLInputElement).value;
-    const composer = (document.getElementById('composer') as HTMLInputElement).value;
-    const source_credit = (document.getElementById('source_credit') as HTMLInputElement).value;
-    const audioInput = document.getElementById('audio-file') as HTMLInputElement;
-    const scoreInput = document.getElementById('score-file') as HTMLInputElement;
+  // ---- Buscar -----------------------------------------------------------
+  const filter = $<HTMLInputElement>('#filter');
+  filter.addEventListener('input', () => {
+    const q = filter.value.trim().toLowerCase();
+    let visible = 0;
+    document.querySelectorAll<HTMLElement>('[data-row]').forEach((row) => {
+      const show = !q || (row.dataset.search ?? '').includes(q);
+      row.hidden = !show;
+      if (show) visible++;
+    });
+    $('#empty-state').classList.toggle('hidden', visible > 0);
+  });
 
-    const audioFile = audioInput.files?.[0];
-    const scoreFile = scoreInput.files?.[0];
+  // ---- Acciones por fila ------------------------------------------------
+  const editDialog = $<HTMLDialogElement>('#edit-dialog');
+  const deleteDialog = $<HTMLDialogElement>('#delete-dialog');
+  let currentId = '';
 
-    if (!audioFile) {
-      statusDiv.textContent = 'El archivo de audio es obligatorio.';
-      statusDiv.className = 'text-sm text-red-400 bg-red-950/50 border border-red-900/50 p-3 rounded-lg';
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Subir y Publicar Pista';
-      return;
+  document.querySelectorAll<HTMLElement>('[data-close]').forEach((b) =>
+    b.addEventListener('click', () => b.closest('dialog')?.close())
+  );
+
+  $('#tracks-body')?.addEventListener('click', async (e) => {
+    const btn = (e.target as Element).closest<HTMLButtonElement>('[data-action]');
+    if (!btn) return;
+    const row = rowOf(btn);
+    currentId = row.dataset.id!;
+
+    if (btn.dataset.action === 'toggle') {
+      btn.disabled = true;
+      try {
+        const now = row.dataset.published === 'true';
+        await api(`/api/tracks/${currentId}`, 'PATCH', { is_published: !now });
+        reloadWith(now ? 'Pista oculta a los alumnos.' : 'Pista publicada.');
+      } catch (err) {
+        toast((err as Error).message, 'error');
+        btn.disabled = false;
+      }
     }
 
+    if (btn.dataset.action === 'edit') {
+      $<HTMLInputElement>('#ed-title').value = row.dataset.title ?? '';
+      $<HTMLInputElement>('#ed-composer').value = row.dataset.composer ?? '';
+      $<HTMLInputElement>('#ed-category').value = row.dataset.category ?? '';
+      $<HTMLInputElement>('#ed-credit').value = row.dataset.credit ?? '';
+      $<HTMLInputElement>('#ed-published').checked = row.dataset.published === 'true';
+      $<HTMLInputElement>('#ed-audio').value = '';
+      $<HTMLInputElement>('#ed-score').value = '';
+      $<HTMLInputElement>('#ed-remove-score').checked = false;
+      const hasScore = row.dataset.hasScore === 'true';
+      $('#ed-remove-score-wrap').classList.toggle('hidden', !hasScore);
+      $('#ed-score-label').textContent = hasScore ? 'Sustituir partitura (PDF)' : 'Añadir partitura (PDF)';
+      $('#edit-error').classList.add('hidden');
+      editDialog.showModal();
+    }
+
+    if (btn.dataset.action === 'delete') {
+      $('#delete-title').textContent = `«${row.dataset.title}»`;
+      $('#delete-error').classList.add('hidden');
+      deleteDialog.showModal();
+    }
+  });
+
+  // ---- Guardar edición --------------------------------------------------
+  $<HTMLFormElement>('#edit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('#edit-error');
+    const btn = $<HTMLButtonElement>('#edit-submit');
+    err.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
     try {
-      const audioRes = await fetch('/api/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: audioFile.name, fileType: audioFile.type })
-      });
-      const audioData = await audioRes.json();
-      if (!audioRes.ok) throw new Error(audioData.error);
+      const body: Record<string, unknown> = {
+        title: $<HTMLInputElement>('#ed-title').value,
+        composer: $<HTMLInputElement>('#ed-composer').value,
+        category: $<HTMLInputElement>('#ed-category').value,
+        source_credit: $<HTMLInputElement>('#ed-credit').value,
+        is_published: $<HTMLInputElement>('#ed-published').checked,
+      };
+      const audio = $<HTMLInputElement>('#ed-audio').files?.[0];
+      const score = $<HTMLInputElement>('#ed-score').files?.[0];
+      if (audio) body.audio_key = await uploadFile(audio);
+      if (score) body.score_key = await uploadFile(score);
+      else if ($<HTMLInputElement>('#ed-remove-score').checked) body.score_key = null;
 
-      const audioPut = await fetch(audioData.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': audioFile.type },
-        body: audioFile
-      });
-      if (!audioPut.ok) throw new Error('No se pudo subir el audio a R2 (revisa la política CORS del bucket).');
-      const audioKey = audioData.objectKey;
+      await api(`/api/tracks/${currentId}`, 'PATCH', body);
+      reloadWith('Cambios guardados.');
+    } catch (e2) {
+      err.textContent = (e2 as Error).message;
+      err.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Guardar cambios';
+    }
+  });
 
-      let scoreKey = null;
-      if (scoreFile) {
-        const scoreRes = await fetch('/api/upload-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: scoreFile.name, fileType: scoreFile.type })
-        });
-        const scoreData = await scoreRes.json();
-        if (!scoreRes.ok) throw new Error(scoreData.error);
-
-        const scorePut = await fetch(scoreData.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': scoreFile.type },
-          body: scoreFile
-        });
-        if (!scorePut.ok) throw new Error('No se pudo subir la partitura a R2 (revisa la política CORS del bucket).');
-        scoreKey = scoreData.objectKey;
-      }
-
-      const { error: dbError } = await supabase.from('tracks').insert({
-        title,
-        composer,
-        audio_key: audioKey,
-        score_key: scoreKey,
-        source_credit,
-        is_published: true
-      });
-
-      if (dbError) throw new Error(dbError.message);
-
-      statusDiv.textContent = '¡Pista subida y publicada con éxito!';
-      statusDiv.className = 'text-sm text-emerald-400 bg-emerald-950/50 border border-emerald-900/50 p-3 rounded-lg';
-      form.reset();
-      loadTracks();
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Subir y Publicar Pista';
-
-    } catch (err: any) {
-      statusDiv.textContent = 'Error: ' + (err.message || 'Error desconocido');
-      statusDiv.className = 'text-sm text-red-400 bg-red-950/50 border border-red-900/50 p-3 rounded-lg';
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Subir y Publicar Pista';
+  // ---- Confirmar borrado ------------------------------------------------
+  $<HTMLButtonElement>('#delete-confirm').addEventListener('click', async () => {
+    const btn = $<HTMLButtonElement>('#delete-confirm');
+    const err = $('#delete-error');
+    btn.disabled = true;
+    err.classList.add('hidden');
+    try {
+      await api(`/api/tracks/${currentId}`, 'DELETE');
+      reloadWith('Pista borrada.');
+    } catch (e2) {
+      err.textContent = (e2 as Error).message;
+      err.classList.remove('hidden');
+      btn.disabled = false;
     }
   });
 </script>

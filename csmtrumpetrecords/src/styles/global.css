@@ -53,3 +53,30 @@ footer.site-foot { border-top: 1px solid var(--rule); margin-top: 3rem; padding:
 
 /* Para usar el reproductor dentro de páginas con fondo oscuro fijo (Tailwind gray-950). */
 .theme-dark { --paper: #13151b; --ink: #e8e8e4; --muted: #9aa1ae; --rule: #2a2e38; --accent: #d4ab52; color: var(--ink); font-family: var(--sans); }
+
+/* ------------------------------------------------------------------
+   Sistema de diseño (Tailwind v4). Color de marca: latón/ámbar.
+   Se usa con clases normales: bg-primary-600, text-primary-700, etc.
+------------------------------------------------------------------ */
+@theme {
+  --color-primary-50: #fbf7ec;
+  --color-primary-100: #f4ead0;
+  --color-primary-200: #e8d3a0;
+  --color-primary-300: #dab86c;
+  --color-primary-400: #cc9f42;
+  --color-primary-500: #b8861f;
+  --color-primary-600: #946c17;
+  --color-primary-700: #7a5a14;
+  --color-primary-800: #5f4510;
+  --color-primary-900: #46330d;
+}
+
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-60; }
+@utility btn-primary { @apply btn bg-primary-600 text-white hover:bg-primary-700; }
+@utility btn-secondary { @apply btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-50; }
+@utility btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-600; }
+@utility btn-ghost { @apply btn px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 hover:text-gray-900; }
+@utility card { @apply rounded-xl border border-gray-200 bg-white shadow-sm; }
+@utility field-label { @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500; }
+@utility field { @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-200; }
+@utility badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }

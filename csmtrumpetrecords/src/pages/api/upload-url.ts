@@ -26,7 +26,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
       return json({ error: 'Tipo de archivo no permitido (solo MP3 y PDF)' }, 400);
     }
 
-    const uniqueKey = `${Date.now()}-${String(filename).replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    // Nombre limpio y acotado: la clave resultante debe cumplir OBJECT_KEY_RE (src/lib/r2.ts).
+    const cleanName = String(filename).replace(/[^a-zA-Z0-9.-]/g, '_').slice(-150);
+    const uniqueKey = `${Date.now()}-${cleanName}`;
 
     const command = new PutObjectCommand({
       Bucket: R2_BUCKET_NAME,
